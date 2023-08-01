@@ -1,44 +1,51 @@
-package com.example.movieshow
+package com.example.movieshow.network
 
+import com.example.movieshow.models.Response
+import com.example.movieshow.utils.Constants
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.create
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Query
 
 interface MovieApi {
 
     @GET("movie/popular")
     suspend fun getPopularMovies(
         @Header("Authorization") auth : String = "Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0YzUwZGQ5NjkwYzljNDAzNzNiM2I3MTY2ZGEzNzBmYyIsInN1YiI6IjY0YzBkNjdlZGY4NmE4MDEwNjM2ODk5YyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.J43R8SLFWMJekHIw_W4mVDys9JffAatRT3Uy6YFVkZM",
+        @Query("page") page : Int
     ) : Response
 
     @GET("movie/upcoming")
     suspend fun getUpcomingMovies(
         @Header("Authorization") auth : String = "Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0YzUwZGQ5NjkwYzljNDAzNzNiM2I3MTY2ZGEzNzBmYyIsInN1YiI6IjY0YzBkNjdlZGY4NmE4MDEwNjM2ODk5YyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.J43R8SLFWMJekHIw_W4mVDys9JffAatRT3Uy6YFVkZM",
+        @Query("page") page : Int
     ) : Response
 
     @GET("trending/movie/day")
     suspend fun getTrendingMovies(
         @Header("Authorization") auth : String = "Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0YzUwZGQ5NjkwYzljNDAzNzNiM2I3MTY2ZGEzNzBmYyIsInN1YiI6IjY0YzBkNjdlZGY4NmE4MDEwNjM2ODk5YyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.J43R8SLFWMJekHIw_W4mVDys9JffAatRT3Uy6YFVkZM",
+        @Query("page") page : Int
     ) : Response
 
     @GET("movie/top_rated")
     suspend fun getTopRatedMovies(
         @Header("Authorization") auth : String = "Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0YzUwZGQ5NjkwYzljNDAzNzNiM2I3MTY2ZGEzNzBmYyIsInN1YiI6IjY0YzBkNjdlZGY4NmE4MDEwNjM2ODk5YyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.J43R8SLFWMJekHIw_W4mVDys9JffAatRT3Uy6YFVkZM",
+        @Query("page") page : Int
     ) : Response
 
-    companion object{
-        var apiService : MovieApi ?= null
+    companion object {
+        fun getRetrofit(): Retrofit {
+            return Retrofit.Builder()
+                .baseUrl(Constants.BASE_URL)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
 
-         fun getInstance() : MovieApi{
-             if(apiService==null){
-                 apiService = Retrofit.Builder()
-                     .baseUrl("https://api.themoviedb.org/3/")
-                     .addConverterFactory(GsonConverterFactory.create())
-                     .build().create(MovieApi::class.java)
-             }
-             return apiService!!
+        }
+
+        fun getMovieApi(retrofit: Retrofit): MovieApi {
+            return retrofit.create(MovieApi::class.java)
         }
     }
+
 }

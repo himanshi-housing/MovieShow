@@ -1,4 +1,4 @@
-package com.example.movieshow
+package com.example.movieshow.database
 
 import androidx.compose.ui.text.resolveDefaults
 import androidx.room.ColumnInfo

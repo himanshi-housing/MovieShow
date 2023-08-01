@@ -1,22 +1,25 @@
 package com.example.movieshow
 
+//import androidx.compose.foundation.layout.BoxScopeInstance.align
+//import androidx.compose.foundation.layout.BoxScopeInstance.matchParentSize
+//import androidx.compose.foundation.layout.ColumnScopeInstance.align
+//import androidx.compose.foundation.layout.ColumnScopeInstance.weight
+//import androidx.compose.foundation.layout.RowScopeInstance.align
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.os.Bundle
-import android.widget.Toast
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-//import androidx.compose.foundation.layout.BoxScopeInstance.matchParentSize
 import androidx.compose.foundation.layout.Column
-//import androidx.compose.foundation.layout.ColumnScopeInstance.weight
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,8 +29,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.Scaffold
+import androidx.compose.material.SnackbarHost
+import androidx.compose.material.SnackbarHostState
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -35,14 +42,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -53,7 +59,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -61,23 +66,35 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.movieshow.ui.theme.MovieShowTheme
 import coil.compose.AsyncImage
-import kotlinx.coroutines.Dispatchers
+import com.example.movieshow.ui.theme.MovieShowTheme
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
+
 
 class MainActivity : ComponentActivity() {
 //    lateinit var receiver : InternetOff
-    val movieViewModel by viewModels<MovieViewModel>()
+    lateinit var movieViewModel: MovieViewModel
+//    var lastScreen : String = "Landing Page"
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
+    super.onCreate(savedInstanceState)
+
+    val movieDao = MovieDatabase.getInstance(this).movieDao()
+    val viewModelFactory = MovieViewModelFactory(movieDao)
+    movieViewModel = ViewModelProvider(this, viewModelFactory)[MovieViewModel::class.java]
+    val sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
+    val lastVisitedScreen = sharedPreferences.getString("lastVisitedScreen", "Landing Page")
+    if (lastVisitedScreen !=null) {
+        movieViewModel.lastScreen = lastVisitedScreen
+    }
+    else{
+        movieViewModel.lastScreen = "Landing Page"
+    }
+    setContent() {
             MovieShowTheme {
                 // A surface container using the 'background' color from the theme
                 Surface(
@@ -88,25 +105,28 @@ class MainActivity : ComponentActivity() {
 //                    IntentFilter().also {
 //                        registerReceiver(receiver,it)
 //                    }
+
                     movieViewModel.getPopular()
                     movieViewModel.getUpcoming()
                     movieViewModel.getTrending()
                     movieViewModel.getTopRated()
-                    val db = MovieDatabase.getInstance(applicationContext).MovieDao()
+
+
                     val navControl = rememberNavController()
                     NavHost(navController = navControl, 
-                    startDestination = "Landing Page"){
+                    startDestination = movieViewModel.lastScreen){
                         composable("Landing Page"){
-                            LandingPage(navController = navControl, movieViewModel, db)
+                            LandingPage(navController = navControl, movieViewModel)
                         }
-                        composable("Detailed View/{title}/{desc}/{poster}"){
+                        composable("Detailed View/{lastscreen}/{title}/{desc}/{poster}"){
+                            val lastScreen = it.arguments?.getString("lastscreen") ?: "Landing Page"
                             val  poster = "https://image.tmdb.org/t/p/w500/"+ (it.arguments?.getString("poster") ?: "")
                             val  title = it.arguments?.getString("title") ?: ""
                             val  descrptn = it.arguments?.getString("desc") ?: ""
-                            DetailedView(navController = navControl,poster,title, descrptn)
+                            DetailedView(navController = navControl,poster,title, descrptn, lastScreen)
                         }
                         composable("Watch List"){
-                            Watchlist(navController = navControl, movieViewModel,db)
+                            Watchlist(navController = navControl, movieViewModel)
                         }
                     }
                 }
@@ -114,21 +134,32 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-
+    override fun onStop() {
+        super.onStop()
+        val sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
+        val editor = sharedPreferences.edit()
+        // Save the last visited screen information (e.g., screen name or index) to SharedPreferences
+        editor.putString("lastVisitedScreen", movieViewModel.lastScreen) // Replace "ScreenName" with the appropriate identifier for your screen
+        editor.apply()
     }
 }
 
-@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter", "RememberReturnType")
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter", "RememberReturnType",
+    "CoroutineCreationDuringComposition"
+)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel, db : MovieDao){
+fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel){
     val movieType = listOf<String>("popular","upcoming","trending","top-rated")
-//    var selected by rememberSaveable {
-//        mutableStateOf(movieViewModel.pageNo)
-//    }
-    Scaffold(
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    var isClicked by remember {
+        mutableStateOf(false)
+    }
+    var title by remember {
+        mutableStateOf("")
+    }
+    Scaffold(snackbarHost = { SnackbarHost(hostState = snackbarHostState)},
         topBar = { TopAppBar(
             title = {
                 Row(
@@ -145,7 +176,13 @@ fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel, 
                         contentDescription = "",
                         modifier = Modifier
                             .width(20.dp)
-                            .clickable { navController.navigate("Watch List") })
+                            .clickable {
+//                                movieViewModel.getWatchlistMovie()
+                                movieViewModel.scrollState =
+                                    MutableList(4) { LazyListState(0, 0) }
+                                movieViewModel.lastScreen = "Watch List"
+                                navController.navigate("Watch List")
+                            })
                 }
             },
             colors = TopAppBarDefaults.mediumTopAppBarColors(
@@ -155,31 +192,50 @@ fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel, 
             modifier = Modifier
                 .clip(shape = RoundedCornerShape(0.dp, 0.dp, 15.dp, 15.dp)),
         )},
-        content = { Listview( movieViewModel, navController,db)},
+        content = { margin -> Listview( movieViewModel, navController, margin) {
+            isClicked = true
+            title = it
+        }
+        },
         bottomBar = { BottomAppBar(modifier = Modifier.fillMaxWidth(),
             actions = {
-                IconButton(onClick = { movieViewModel.pageNo = 0 }, modifier = Modifier.weight(1f)) {
+                IconButton(onClick = { movieViewModel.pageNo = 0
+                                       movieViewModel.scrollState = MutableList(4){LazyListState(0,0)} },
+                    modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Image(painter = painterResource(id = R.drawable.fire), contentDescription = "", modifier = Modifier.weight(1f))
                         Text(text = "popular", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                         }
                     }
-                IconButton(onClick = { movieViewModel.pageNo = 1 }, modifier = Modifier.weight(1f)) {
+                IconButton(onClick = { movieViewModel.pageNo = 1
+                    movieViewModel.scrollState = MutableList(4){LazyListState(0,0)}},
+                    modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Image(painter = painterResource(id = R.drawable.punch), contentDescription = "", modifier = Modifier.weight(1f))
                         Text(text = "upcoming", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                     }
                 }
-                IconButton(onClick = { movieViewModel.pageNo = 2 }, modifier = Modifier.weight(1f)) {
+                IconButton(onClick = { movieViewModel.pageNo = 2
+                    movieViewModel.scrollState = MutableList(4){LazyListState(0,0)}},
+                    modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Image(painter = painterResource(id = R.drawable.play), contentDescription = "", modifier = Modifier.weight(1f))
                         Text(text = "trending", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                     }
                 }
-                IconButton(onClick = { movieViewModel.pageNo = 3 }, modifier = Modifier.weight(1f)) {
+                IconButton(onClick = { movieViewModel.pageNo = 3
+                    movieViewModel.scrollState = MutableList(4){LazyListState(0,0)}
+                    },
+                    modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Image(painter = painterResource(id = R.drawable.star), contentDescription = "", modifier = Modifier.weight(1f))
                         Text(text = "top-rated", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                if(isClicked){
+                    scope.launch {
+                        snackbarHostState.showSnackbar("${title} added to the watchlist")
+                        isClicked = false
                     }
                 }
                 })
@@ -188,106 +244,125 @@ fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel, 
 }
 
 @Composable
-fun Listview(movieViewModel: MovieViewModel,navController: NavController, db : MovieDao){
-    val movieType = listOf(movieViewModel.popular,movieViewModel.upcoming, movieViewModel.trending,movieViewModel.topRated)
-    var title by remember {
-        mutableStateOf("")
-    }
-    var isAddClicked by remember {
-        mutableStateOf(false)
-    }
-    LazyColumn(modifier = Modifier.padding(top = 65.dp)){
-        items(items = movieType[movieViewModel.pageNo]){
-            Card(modifier = Modifier
-                .padding(start = 15.dp, end = 15.dp)
-                .padding(top = 10.dp)
-                .height(200.dp)
-                .shadow(5.dp, shape = RoundedCornerShape(15.dp))
-                .clickable {
-                    navController.navigate(
-                        "Detailed View/${it.originalTitle}/${it.overview}/${
-                            it.posterPath?.replace(
-                                "/",
-                                ""
-                            )
-                        }"
-                    )
-                },
-            colors = CardDefaults.cardColors(containerColor = Color.White)) {
-                Row(horizontalArrangement = Arrangement.SpaceBetween) {
-                    AsyncImage(model = "https://image.tmdb.org/t/p/w500/${it.posterPath}", contentDescription = "", modifier = Modifier
-                        .padding(10.dp)
-                        .clip(shape = RoundedCornerShape(15.dp)))
-                    Column(modifier = Modifier
-                        .padding(10.dp)
-                        .height(180.dp)) {
-                        Column(modifier = Modifier.height(160.dp)) {
-                            Text(text = it.originalTitle?:"", 
-                                fontWeight = FontWeight.SemiBold, 
-                                fontSize = 15.sp,
-                                color = colorResource(id = R.color.navy))
-                            Text(text = it.overview?:"", fontSize = 12.sp,
-                                modifier = Modifier
-                                    .padding(top = 10.dp)
-                                    .wrapContentWidth(),
-                                lineHeight = 15.sp,
-                                maxLines = 4,
-                            overflow = TextOverflow.Ellipsis)
-                            Text(text = it.voteAverage.toString()?:"",
-                                color = Color.White,
-                                textAlign = TextAlign.Center,
-                                fontSize = 14.sp,
-                                modifier = Modifier
-                                    .width(40.dp)
-                                    .height(40.dp)
-                                    .padding(top = 10.dp)
-                                    .clip(shape = RoundedCornerShape(15.dp))
-                                    .background(color = colorResource(id = R.color.navy))
-                                    .padding(5.dp),
-                                overflow = TextOverflow.Clip
-                            )
+fun Listview(movieViewModel: MovieViewModel,navController: NavController, margin : PaddingValues, onClick : (title : String)-> Unit) {
+    val movieType = listOf(
+        movieViewModel.popular,
+        movieViewModel.upcoming,
+        movieViewModel.trending,
+        movieViewModel.topRated
+    )
+    var scrollState = movieViewModel.scrollState[movieViewModel.pageNo]
 
-                        }
-                        Row {
-                            val scope = rememberCoroutineScope()
-                            it.releaseDate?.let { it1 ->
+    Column(modifier = Modifier.padding(margin)) {
+        if(scrollState.isScrollInProgress){
+            movieViewModel.scrollState[movieViewModel.pageNo]= LazyListState(scrollState.firstVisibleItemIndex,scrollState.firstVisibleItemScrollOffset)
+            Log.d("Himanshi",movieViewModel.scrollState.toString())
+        }
+        LazyColumn(state = movieViewModel.scrollState[movieViewModel.pageNo]) {
+            items(items = movieType[movieViewModel.pageNo]) {
+                Card(
+                    modifier = Modifier
+                        .padding(start = 15.dp, end = 15.dp)
+                        .padding(top = 10.dp)
+                        .height(200.dp)
+                        .shadow(5.dp, shape = RoundedCornerShape(15.dp))
+                        .clickable {
+                            movieViewModel.lastScreen = "Landing Page"
+                            navController.navigate(
+                                "Detailed View/Landing Page/${it.originalTitle}/${it.overview}/${
+                                    it.posterPath?.replace(
+                                        "/",
+                                        ""
+                                    )
+                                }"
+                            )
+                        },
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Row(horizontalArrangement = Arrangement.SpaceBetween) {
+                        AsyncImage(
+                            model = "https://image.tmdb.org/t/p/w500/${it.posterPath}",
+                            contentDescription = "",
+                            modifier = Modifier
+                                .padding(10.dp)
+                                .clip(shape = RoundedCornerShape(15.dp)),
+                            error = painterResource(id = R.drawable.baseline_image_24)
+                        )
+                        Column(
+                            modifier = Modifier
+                                .padding(10.dp)
+                                .height(180.dp)
+                        ) {
+                            Column(modifier = Modifier.height(160.dp)) {
                                 Text(
-                                    text = "release date: ${it1}",
-                                    fontSize = 12.sp,
-                                    color = colorResource(id = R.color.grey),
-                                    modifier = Modifier.width(170.dp)
+                                    text = it.originalTitle ?: "",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 15.sp,
+                                    color = colorResource(id = R.color.navy)
                                 )
-                            }
-                            IconButton(onClick = {
-                                scope.launch {
-                                    db.insert(
-                                        MovieItem(
-                                            System.currentTimeMillis(),
-                                            it.backdropPath ?: "",
-                                            it.title ?: "",
-                                            ""
-                                        )
+                                Text(
+                                    text = it.overview ?: "", fontSize = 12.sp,
+                                    modifier = Modifier
+                                        .padding(top = 10.dp)
+                                        .wrapContentWidth(),
+                                    lineHeight = 15.sp,
+                                    maxLines = 4,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (it.voteAverage!! > 0) {
+                                    Text(
+                                        text = it.voteAverage.toString() ?: "",
+                                        color = Color.White,
+                                        textAlign = TextAlign.Center,
+                                        fontSize = 14.sp,
+                                        modifier = Modifier
+                                            .width(40.dp)
+                                            .height(40.dp)
+                                            .padding(top = 10.dp)
+                                            .clip(shape = RoundedCornerShape(15.dp))
+                                            .background(color = colorResource(id = R.color.navy))
+                                            .padding(5.dp),
+                                        overflow = TextOverflow.Clip
                                     )
                                 }
-                                title=it.originalTitle?:""
-                                isAddClicked = !isAddClicked
-                            }) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.baseline_add_circle_outline_24),
-                                    contentDescription = ""
-                                )
                             }
+                            Row {
+                                val scope = rememberCoroutineScope()
+                                it.releaseDate?.let { it1 ->
+                                    Text(
+                                        text = "release date: ${it1}",
+                                        fontSize = 12.sp,
+                                        color = colorResource(id = R.color.grey),
+                                        modifier = Modifier.width(170.dp)
+                                    )
+                                }
+                                IconButton(onClick = {
+                                    movieViewModel.addMovie(
+                                        MovieItem(
+                                            it.id ?: 0,
+                                            System.currentTimeMillis(),
+                                            it.posterPath ?: "",
+                                            it.backdropPath ?: "",
+                                            it.originalTitle ?: "",
+                                            it.overview ?: ""
+                                        ))
+                                    onClick(it.originalTitle?:"")
+//                                    scope.launch {
+//                                        Log.d("Himanshi","hi")
+//                                        scaffoldState.snackbarHostState.showSnackbar("${it.originalTitle} is added to the watchlist! ", duration = androidx.compose.material.SnackbarDuration.Short)
+//
+//                                    }
+//                                    title = it.originalTitle ?: ""
+                                }) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.baseline_add_circle_outline_24),
+                                        contentDescription = ""
+                                    )
+                                }
 
+                            }
                         }
                     }
-                }
-                if (isAddClicked){
-                    Toast.makeText(
-                        LocalContext.current,
-                        "${title} added to Watchlist",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                    isAddClicked = !isAddClicked
                 }
             }
         }
@@ -298,7 +373,7 @@ fun Listview(movieViewModel: MovieViewModel,navController: NavController, db : M
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailedView(navController: NavController, poster : String, title : String, descrptn : String){
+fun DetailedView(navController: NavController, poster : String, title : String, descrptn : String, lastScreen : String){
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item{
             Box(
@@ -338,23 +413,15 @@ fun DetailedView(navController: NavController, poster : String, title : String, 
             modifier = Modifier
                 .padding(10.dp)
                 .clickable {
-                    navController.navigate("Landing Page")
+                    navController.navigate(lastScreen)
                 })
     }
 }
 
 @Composable
-fun Watchlist(navController: NavController, movieViewModel: MovieViewModel,db : MovieDao){
+fun Watchlist(navController: NavController, movieViewModel: MovieViewModel){
     val scope = rememberCoroutineScope()
-    val listOfMovies by remember {
-        derivedStateOf {
-            runBlocking {
-                withContext(Dispatchers.IO){
-                    db.getAll()
-                }
-            }
-        }
-    }
+    val listOfMovies by movieViewModel.watchList.observeAsState(listOf())
 
     Column(modifier = Modifier.padding(15.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
@@ -363,6 +430,7 @@ fun Watchlist(navController: NavController, movieViewModel: MovieViewModel,db : 
                 modifier = Modifier
                     .padding(end = 10.dp)
                     .clickable {
+                        movieViewModel.lastScreen = "Landing Page"
                         navController.navigate("Landing Page")
                     })
             Text(text = "watchlist", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
@@ -376,11 +444,22 @@ fun Watchlist(navController: NavController, movieViewModel: MovieViewModel,db : 
                         .border(2.dp, Color.DarkGray, RoundedCornerShape(10.dp))
                     ) {
 
-                        AsyncImage(model = "https://image.tmdb.org/t/p/w500/${it.url}",
+                        AsyncImage(model = "https://image.tmdb.org/t/p/w500/${it.shortPoster}",
                             contentDescription = "",
                             modifier = Modifier
                                 .clip(shape = RoundedCornerShape(10.dp))
                                 .fillMaxSize()
+                                .clickable {
+                                    movieViewModel.lastScreen = "Watch List"
+                                    navController.navigate(
+                                        "Detailed View/Watch List/${it.title}/${it.descrptn}/${
+                                            it.longPoster?.replace(
+                                                "/",
+                                                ""
+                                            )
+                                        }"
+                                    )
+                                }
                         )
                         Box(modifier = Modifier
                             .matchParentSize()
@@ -399,10 +478,7 @@ fun Watchlist(navController: NavController, movieViewModel: MovieViewModel,db : 
                                 modifier = Modifier
                                     .padding(10.dp)
                                     .clickable {
-                                        scope.launch {
-                                            db.deleteId(it.time)
-                                            navController.navigate("Watch List")
-                                        }
+                                        movieViewModel.deleteMovie(it.id)
                                     })
                             Text(text = it.title,  color = Color.White, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 10.dp, top = 160.dp))
 

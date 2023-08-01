@@ -1,13 +1,7 @@
 package com.example.movieshow
 
-//import androidx.compose.foundation.layout.BoxScopeInstance.align
-//import androidx.compose.foundation.layout.BoxScopeInstance.matchParentSize
-//import androidx.compose.foundation.layout.ColumnScopeInstance.align
-//import androidx.compose.foundation.layout.ColumnScopeInstance.weight
-//import androidx.compose.foundation.layout.RowScopeInstance.align
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -71,77 +65,76 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.paging.LoadState
+import androidx.paging.compose.items
+import androidx.paging.compose.itemsIndexed
 import coil.compose.AsyncImage
+import com.example.movieshow.database.MovieDatabase
+import com.example.movieshow.database.MovieItem
+import com.example.movieshow.network.MovieApi
 import com.example.movieshow.ui.theme.MovieShowTheme
+import com.example.movieshow.viewModels.MovieViewModel
 import kotlinx.coroutines.launch
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemsIndexed
 
 
 class MainActivity : ComponentActivity() {
-//    lateinit var receiver : InternetOff
     lateinit var movieViewModel: MovieViewModel
-//    var lastScreen : String = "Landing Page"
     override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
+        super.onCreate(savedInstanceState)
 
-    val movieDao = MovieDatabase.getInstance(this).movieDao()
-    val viewModelFactory = MovieViewModelFactory(movieDao)
-    movieViewModel = ViewModelProvider(this, viewModelFactory)[MovieViewModel::class.java]
-    val sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
-    val lastVisitedScreen = sharedPreferences.getString("lastVisitedScreen", "Landing Page")
-    if (lastVisitedScreen !=null) {
-        movieViewModel.lastScreen = lastVisitedScreen
-    }
-    else{
-        movieViewModel.lastScreen = "Landing Page"
-    }
-    setContent() {
-            MovieShowTheme {
-                // A surface container using the 'background' color from the theme
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-//                    receiver = InternetOff()
-//                    IntentFilter().also {
-//                        registerReceiver(receiver,it)
-//                    }
+        val movieDao = MovieDatabase.getInstance(this).movieDao()
+        val movieApi = MovieApi.getMovieApi(MovieApi.getRetrofit())
+        val viewModelFactory = MovieViewModelFactory(movieDao, movieApi)
+        val movieViewModel = ViewModelProvider(this, viewModelFactory)[MovieViewModel::class.java]
 
-                    movieViewModel.getPopular()
-                    movieViewModel.getUpcoming()
-                    movieViewModel.getTrending()
-                    movieViewModel.getTopRated()
+        val sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
+        val lastVisitedScreen = sharedPreferences.getString("lastVisitedScreen", "Landing Page")
+        if (lastVisitedScreen !=null) {
+            movieViewModel.lastScreen = lastVisitedScreen
+        }
+        else{
+            movieViewModel.lastScreen = "Landing Page"
+        }
+        setContent() {
+                MovieShowTheme {
+                    // A surface container using the 'background' color from the theme
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
 
-
-                    val navControl = rememberNavController()
-                    NavHost(navController = navControl, 
-                    startDestination = movieViewModel.lastScreen){
-                        composable("Landing Page"){
-                            LandingPage(navController = navControl, movieViewModel)
-                        }
-                        composable("Detailed View/{lastscreen}/{title}/{desc}/{poster}"){
-                            val lastScreen = it.arguments?.getString("lastscreen") ?: "Landing Page"
-                            val  poster = "https://image.tmdb.org/t/p/w500/"+ (it.arguments?.getString("poster") ?: "")
-                            val  title = it.arguments?.getString("title") ?: ""
-                            val  descrptn = it.arguments?.getString("desc") ?: ""
-                            DetailedView(navController = navControl,poster,title, descrptn, lastScreen)
-                        }
-                        composable("Watch List"){
-                            Watchlist(navController = navControl, movieViewModel)
+                        val navControl = rememberNavController()
+                        NavHost(navController = navControl,
+                        startDestination = movieViewModel.lastScreen){
+                            composable("Landing Page"){
+                                LandingPage(navController = navControl, movieViewModel)
+                            }
+                            composable("Detailed View/{lastscreen}/{title}/{desc}/{poster}"){
+                                val lastScreen = it.arguments?.getString("lastscreen") ?: "Landing Page"
+                                val  poster = "https://image.tmdb.org/t/p/w500/"+ (it.arguments?.getString("poster") ?: "")
+                                val  title = it.arguments?.getString("title") ?: ""
+                                val  descrptn = it.arguments?.getString("desc") ?: ""
+                                DetailedView(navController = navControl,poster,title, descrptn, lastScreen)
+                            }
+                            composable("Watch List"){
+                                Watchlist(navController = navControl, movieViewModel)
+                            }
                         }
                     }
                 }
             }
         }
-    }
 
-    override fun onStop() {
-        super.onStop()
-        val sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
-        val editor = sharedPreferences.edit()
-        // Save the last visited screen information (e.g., screen name or index) to SharedPreferences
-        editor.putString("lastVisitedScreen", movieViewModel.lastScreen) // Replace "ScreenName" with the appropriate identifier for your screen
-        editor.apply()
-    }
+        override fun onStop() {
+            super.onStop()
+            val sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
+            val editor = sharedPreferences.edit()
+            // Save the last visited screen information (e.g., screen name or index) to SharedPreferences
+            editor.putString("lastVisitedScreen", movieViewModel.lastScreen) // Replace "ScreenName" with the appropriate identifier for your screen
+            editor.apply()
+        }
 }
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter", "RememberReturnType",
@@ -244,122 +237,131 @@ fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel){
 }
 
 @Composable
-fun Listview(movieViewModel: MovieViewModel,navController: NavController, margin : PaddingValues, onClick : (title : String)-> Unit) {
+fun Listview(movieViewModel: MovieViewModel, navController: NavController, margin : PaddingValues, onClick : (title : String)-> Unit) {
     val movieType = listOf(
-        movieViewModel.popular,
-        movieViewModel.upcoming,
-        movieViewModel.trending,
-        movieViewModel.topRated
+        movieViewModel.popular.collectAsLazyPagingItems(),
+        movieViewModel.upcoming.collectAsLazyPagingItems(),
+        movieViewModel.trending.collectAsLazyPagingItems(),
+        movieViewModel.topRated.collectAsLazyPagingItems()
     )
     var scrollState = movieViewModel.scrollState[movieViewModel.pageNo]
 
-    Column(modifier = Modifier.padding(margin)) {
-        if(scrollState.isScrollInProgress){
-            movieViewModel.scrollState[movieViewModel.pageNo]= LazyListState(scrollState.firstVisibleItemIndex,scrollState.firstVisibleItemScrollOffset)
-            Log.d("Himanshi",movieViewModel.scrollState.toString())
+    when(movieType[movieViewModel.pageNo].loadState.refresh){
+        LoadState.Loading -> {
+
         }
-        LazyColumn(state = movieViewModel.scrollState[movieViewModel.pageNo]) {
-            items(items = movieType[movieViewModel.pageNo]) {
-                Card(
-                    modifier = Modifier
-                        .padding(start = 15.dp, end = 15.dp)
-                        .padding(top = 10.dp)
-                        .height(200.dp)
-                        .shadow(5.dp, shape = RoundedCornerShape(15.dp))
-                        .clickable {
-                            movieViewModel.lastScreen = "Landing Page"
-                            navController.navigate(
-                                "Detailed View/Landing Page/${it.originalTitle}/${it.overview}/${
-                                    it.posterPath?.replace(
-                                        "/",
-                                        ""
+        is LoadState.Error -> {
+
+        }
+        else -> {
+            Column(modifier = Modifier.padding(margin)) {
+                if(scrollState.isScrollInProgress){
+                    movieViewModel.scrollState[movieViewModel.pageNo]= LazyListState(scrollState.firstVisibleItemIndex,scrollState.firstVisibleItemScrollOffset)
+                    Log.d("Himanshi",movieViewModel.scrollState.toString())
+                }
+                LazyColumn(state = movieViewModel.scrollState[movieViewModel.pageNo]) {
+                    itemsIndexed(items = movieType[movieViewModel.pageNo]) {
+                            index, item ->
+                        Card(
+                            modifier = Modifier
+                                .padding(start = 15.dp, end = 15.dp)
+                                .padding(top = 10.dp)
+                                .height(200.dp)
+                                .shadow(5.dp, shape = RoundedCornerShape(15.dp))
+                                .clickable {
+                                    navController.navigate(
+                                        "Detailed View/Landing Page/${item?.originalTitle}/${item?.overview}/${
+                                            item?.posterPath?.replace(
+                                                "/",
+                                                ""
+                                            )
+                                        }"
                                     )
-                                }"
-                            )
-                        },
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
-                ) {
-                    Row(horizontalArrangement = Arrangement.SpaceBetween) {
-                        AsyncImage(
-                            model = "https://image.tmdb.org/t/p/w500/${it.posterPath}",
-                            contentDescription = "",
-                            modifier = Modifier
-                                .padding(10.dp)
-                                .clip(shape = RoundedCornerShape(15.dp)),
-                            error = painterResource(id = R.drawable.baseline_image_24)
-                        )
-                        Column(
-                            modifier = Modifier
-                                .padding(10.dp)
-                                .height(180.dp)
+                                },
+                            colors = CardDefaults.cardColors(containerColor = Color.White)
                         ) {
-                            Column(modifier = Modifier.height(160.dp)) {
-                                Text(
-                                    text = it.originalTitle ?: "",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 15.sp,
-                                    color = colorResource(id = R.color.navy)
-                                )
-                                Text(
-                                    text = it.overview ?: "", fontSize = 12.sp,
+                            Row(horizontalArrangement = Arrangement.SpaceBetween) {
+                                AsyncImage(
+                                    model = "https://image.tmdb.org/t/p/w500/${item?.posterPath}",
+                                    contentDescription = "",
                                     modifier = Modifier
-                                        .padding(top = 10.dp)
-                                        .wrapContentWidth(),
-                                    lineHeight = 15.sp,
-                                    maxLines = 4,
-                                    overflow = TextOverflow.Ellipsis
+                                        .padding(10.dp)
+                                        .clip(shape = RoundedCornerShape(15.dp)),
+                                    error = painterResource(id = R.drawable.baseline_image_24)
                                 )
-                                if (it.voteAverage!! > 0) {
-                                    Text(
-                                        text = it.voteAverage.toString() ?: "",
-                                        color = Color.White,
-                                        textAlign = TextAlign.Center,
-                                        fontSize = 14.sp,
-                                        modifier = Modifier
-                                            .width(40.dp)
-                                            .height(40.dp)
-                                            .padding(top = 10.dp)
-                                            .clip(shape = RoundedCornerShape(15.dp))
-                                            .background(color = colorResource(id = R.color.navy))
-                                            .padding(5.dp),
-                                        overflow = TextOverflow.Clip
-                                    )
-                                }
-                            }
-                            Row {
-                                val scope = rememberCoroutineScope()
-                                it.releaseDate?.let { it1 ->
-                                    Text(
-                                        text = "release date: ${it1}",
-                                        fontSize = 12.sp,
-                                        color = colorResource(id = R.color.grey),
-                                        modifier = Modifier.width(170.dp)
-                                    )
-                                }
-                                IconButton(onClick = {
-                                    movieViewModel.addMovie(
-                                        MovieItem(
-                                            it.id ?: 0,
-                                            System.currentTimeMillis(),
-                                            it.posterPath ?: "",
-                                            it.backdropPath ?: "",
-                                            it.originalTitle ?: "",
-                                            it.overview ?: ""
-                                        ))
-                                    onClick(it.originalTitle?:"")
+                                Column(
+                                    modifier = Modifier
+                                        .padding(10.dp)
+                                        .height(180.dp)
+                                ) {
+                                    Column(modifier = Modifier.height(160.dp)) {
+                                        Text(
+                                            text = item?.originalTitle ?: "",
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 15.sp,
+                                            color = colorResource(id = R.color.navy)
+                                        )
+                                        Text(
+                                            text = item?.overview ?: "", fontSize = 12.sp,
+                                            modifier = Modifier
+                                                .padding(top = 10.dp)
+                                                .wrapContentWidth(),
+                                            lineHeight = 15.sp,
+                                            maxLines = 4,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        if (item?.voteAverage!! > 0) {
+                                            Text(
+                                                text = item?.voteAverage.toString() ?: "",
+                                                color = Color.White,
+                                                textAlign = TextAlign.Center,
+                                                fontSize = 14.sp,
+                                                modifier = Modifier
+                                                    .width(40.dp)
+                                                    .height(40.dp)
+                                                    .padding(top = 10.dp)
+                                                    .clip(shape = RoundedCornerShape(15.dp))
+                                                    .background(color = colorResource(id = R.color.navy))
+                                                    .padding(5.dp),
+                                                overflow = TextOverflow.Clip
+                                            )
+                                        }
+                                    }
+                                    Row {
+                                        val scope = rememberCoroutineScope()
+                                        item?.releaseDate?.let { it1 ->
+                                            Text(
+                                                text = "release date: ${it1}",
+                                                fontSize = 12.sp,
+                                                color = colorResource(id = R.color.grey),
+                                                modifier = Modifier.width(170.dp)
+                                            )
+                                        }
+                                        IconButton(onClick = {
+                                            movieViewModel.addMovie(
+                                                MovieItem(
+                                                    item?.id ?: 0,
+                                                    System.currentTimeMillis(),
+                                                    item?.posterPath ?: "",
+                                                    item?.backdropPath ?: "",
+                                                    item?.originalTitle ?: "",
+                                                    item?.overview ?: ""
+                                                ))
+                                            onClick(item?.originalTitle?:"")
 //                                    scope.launch {
 //                                        Log.d("Himanshi","hi")
 //                                        scaffoldState.snackbarHostState.showSnackbar("${it.originalTitle} is added to the watchlist! ", duration = androidx.compose.material.SnackbarDuration.Short)
 //
 //                                    }
-//                                    title = it.originalTitle ?: ""
-                                }) {
-                                    Icon(
-                                        painter = painterResource(id = R.drawable.baseline_add_circle_outline_24),
-                                        contentDescription = ""
-                                    )
-                                }
+                                        }) {
+                                            Icon(
+                                                painter = painterResource(id = R.drawable.baseline_add_circle_outline_24),
+                                                contentDescription = ""
+                                            )
+                                        }
 
+                                    }
+                                }
                             }
                         }
                     }

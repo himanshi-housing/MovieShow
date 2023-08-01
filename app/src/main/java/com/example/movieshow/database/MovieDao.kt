@@ -1,6 +1,5 @@
-package com.example.movieshow
+package com.example.movieshow.database
 import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.room.*
 
 @Dao
@@ -9,7 +8,7 @@ interface MovieDao {
     fun getAll() : LiveData<List<MovieItem>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(item:MovieItem)
+    suspend fun insert(item: MovieItem)
 
     @Query("DELETE FROM Watchlist where id = :id")
     suspend fun deleteId(id: Int)

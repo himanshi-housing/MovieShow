@@ -2,6 +2,7 @@ package com.example.movieshow
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.net.ConnectivityManager
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,8 +32,10 @@ import androidx.compose.material.Scaffold
 import androidx.compose.material.SnackbarHost
 import androidx.compose.material.SnackbarHostState
 import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +66,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -77,26 +83,32 @@ import com.example.movieshow.viewModels.MovieViewModel
 import kotlinx.coroutines.launch
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemsIndexed
+import coil.compose.AsyncImagePainter
+import coil.compose.rememberAsyncImagePainter
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 
 
 class MainActivity : ComponentActivity() {
-    lateinit var movieViewModel: MovieViewModel
+    lateinit var movieViewModel : MovieViewModel
+    lateinit var connectivityObserver: ConnectivityObserver
+    @SuppressLint("UnrememberedMutableState", "FlowOperatorInvokedInComposition",
+        "CoroutineCreationDuringComposition"
+    )
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        lateinit var status : ConnectivityObserver.Status
+        connectivityObserver  = NetworkConnectivityObserver(applicationContext)
 
         val movieDao = MovieDatabase.getInstance(this).movieDao()
         val movieApi = MovieApi.getMovieApi(MovieApi.getRetrofit())
         val viewModelFactory = MovieViewModelFactory(movieDao, movieApi)
-        val movieViewModel = ViewModelProvider(this, viewModelFactory)[MovieViewModel::class.java]
+        movieViewModel = ViewModelProvider(this, viewModelFactory)[MovieViewModel::class.java]
 
         val sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
-        val lastVisitedScreen = sharedPreferences.getString("lastVisitedScreen", "Landing Page")
-        if (lastVisitedScreen !=null) {
-            movieViewModel.lastScreen = lastVisitedScreen
-        }
-        else{
-            movieViewModel.lastScreen = "Landing Page"
-        }
+        val lastVisitedScreen = sharedPreferences.getString("lastVisitedScreen", "") ?: "Landing Page"
+
         setContent() {
                 MovieShowTheme {
                     // A surface container using the 'background' color from the theme
@@ -104,10 +116,32 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
+                        connectivityObserver.observe().onEach {
+                            status = it
+                            Log.d("Himanshi",status.toString())
+                        }.launchIn(lifecycleScope)
 
+                        val status by connectivityObserver.observe().collectAsState(initial = ConnectivityObserver.Status.Unavailable)
+
+//                        Log.d("Himanshi1",status1.toString())
+                        if(status  == ConnectivityObserver.Status.Available){
+                            Log.d("Himanshi",lastVisitedScreen)
+                            if(lastVisitedScreen=="")
+                                movieViewModel.currentSreen = "Landing Page"
+                            else
+                                movieViewModel.currentSreen = lastVisitedScreen
+                        }
+                        else if(status == ConnectivityObserver.Status.Unavailable || status == ConnectivityObserver.Status.Lost)
+                                movieViewModel.currentSreen  = "Watch List"
+                        if (lastVisitedScreen !="") {
+                            movieViewModel.lastScreen = lastVisitedScreen ?: "Landing Page"
+                        }
+                        else{
+                            movieViewModel.lastScreen = "Landing Page"
+                        }
                         val navControl = rememberNavController()
                         NavHost(navController = navControl,
-                        startDestination = movieViewModel.lastScreen){
+                        startDestination = movieViewModel.currentSreen){
                             composable("Landing Page"){
                                 LandingPage(navController = navControl, movieViewModel)
                             }
@@ -116,7 +150,7 @@ class MainActivity : ComponentActivity() {
                                 val  poster = "https://image.tmdb.org/t/p/w500/"+ (it.arguments?.getString("poster") ?: "")
                                 val  title = it.arguments?.getString("title") ?: ""
                                 val  descrptn = it.arguments?.getString("desc") ?: ""
-                                DetailedView(navController = navControl,poster,title, descrptn, lastScreen)
+                                DetailedView(navController = navControl,poster,title, descrptn, lastScreen, status)
                             }
                             composable("Watch List"){
                                 Watchlist(navController = navControl, movieViewModel)
@@ -134,6 +168,7 @@ class MainActivity : ComponentActivity() {
             // Save the last visited screen information (e.g., screen name or index) to SharedPreferences
             editor.putString("lastVisitedScreen", movieViewModel.lastScreen) // Replace "ScreenName" with the appropriate identifier for your screen
             editor.apply()
+            Log.d("Himanshi",movieViewModel.lastScreen)
         }
 }
 
@@ -348,11 +383,6 @@ fun Listview(movieViewModel: MovieViewModel, navController: NavController, margi
                                                     item?.overview ?: ""
                                                 ))
                                             onClick(item?.originalTitle?:"")
-//                                    scope.launch {
-//                                        Log.d("Himanshi","hi")
-//                                        scaffoldState.snackbarHostState.showSnackbar("${it.originalTitle} is added to the watchlist! ", duration = androidx.compose.material.SnackbarDuration.Short)
-//
-//                                    }
                                         }) {
                                             Icon(
                                                 painter = painterResource(id = R.drawable.baseline_add_circle_outline_24),
@@ -375,48 +405,102 @@ fun Listview(movieViewModel: MovieViewModel, navController: NavController, margi
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailedView(navController: NavController, poster : String, title : String, descrptn : String, lastScreen : String){
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
-        item{
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(590.dp)
-                    .clip(RoundedCornerShape(bottomStart = 35.dp, bottomEnd = 35.dp))
-                    .shadow(5.dp)
-            ) {
-                AsyncImage(
-                    model = poster,
-                    contentDescription = "",
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
-        item{
-            Column(
-                modifier = Modifier
-                    .padding(start = 15.dp, end = 15.dp, top = 30.dp, bottom = 10.dp)
-            ) {
-                Text(text = title, fontSize = 25.sp, fontWeight = FontWeight.SemiBold)
-                Text(
-                    text = descrptn,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(top = 10.dp),
-                    lineHeight = 16.sp
-                )
-            }
-        }
+fun DetailedView(navController: NavController, poster : String, title : String, descrptn : String, lastScreen : String, status: ConnectivityObserver.Status){
+    var isclicked by remember {
+        mutableStateOf(false)
     }
-    Box(modifier = Modifier.fillMaxSize()) {
+    var count by remember {
+        mutableStateOf(0)
+    }
+    Column(modifier = Modifier.fillMaxSize()){
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(590.dp)
+                        .clip(RoundedCornerShape(bottomStart = 35.dp, bottomEnd = 35.dp))
+                        .shadow(5.dp)
+                ) {
+                    if (status != ConnectivityObserver.Status.Available) {
+                        val painter = rememberAsyncImagePainter(model = poster)
+                        if (painter.state is AsyncImagePainter.State.Error) {
+                            Text(text = "Image no loaded")
+                        } else if (painter.state is AsyncImagePainter.State.Success) {
+                            Image(
+                                painter = rememberAsyncImagePainter(model = poster),
+                                contentDescription = ""
+                            )
+                        } else {
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                if (count <= 5) {
+                                    Button(modifier = Modifier,
+                                        onClick = {
+                                            isclicked = true
+                                            count += 1
+                                        }) {
+                                        Text(text = "Retry")
+                                    }
+                                    if (isclicked) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(64.dp),
+                                            color = Color.DarkGray,
+                                            strokeWidth = 6.dp
+                                        )
+                                    }
+                                }
 
-        Icon(painter = painterResource(id = R.drawable.baseline_keyboard_arrow_left_24),
-            contentDescription = "",
-            tint = Color.White,
-            modifier = Modifier
-                .padding(10.dp)
-                .clickable {
-                    navController.navigate(lastScreen)
-                })
+                            }
+                        }
+                    } else
+                        AsyncImage(
+                            model = poster,
+                            contentDescription = "",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    Box(modifier = Modifier.fillMaxSize()) {
+
+                        Icon(painter = painterResource(id = R.drawable.baseline_keyboard_arrow_left_24),
+                            contentDescription = "",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .padding(10.dp)
+                                .clickable {
+                                    navController.navigate(lastScreen)
+                                })
+                    }
+                }
+            }
+            item {
+                Column(
+                    modifier = Modifier
+                        .padding(start = 15.dp, end = 15.dp, top = 30.dp, bottom = 10.dp)
+                ) {
+                    Text(text = title, fontSize = 25.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = descrptn,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(top = 10.dp),
+                        lineHeight = 16.sp
+                    )
+                }
+            }
+        }
+        Box(modifier = Modifier.fillMaxSize()) {
+
+            Icon(painter = painterResource(id = R.drawable.baseline_keyboard_arrow_left_24),
+                contentDescription = "",
+                tint = Color.White,
+                modifier = Modifier
+                    .padding(10.dp)
+                    .clickable {
+                        navController.navigate(lastScreen)
+                    })
+        }
     }
 }
 
@@ -497,4 +581,9 @@ fun Watchlist(navController: NavController, movieViewModel: MovieViewModel){
         }
 
     }
+}
+
+@Composable
+fun RetryUI(){
+
 }

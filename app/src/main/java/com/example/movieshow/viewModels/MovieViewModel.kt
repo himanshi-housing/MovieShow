@@ -1,6 +1,7 @@
 package com.example.movieshow.viewModels
 
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -10,6 +11,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.cachedIn
+import com.example.movieshow.ConnectivityObserver
+import com.example.movieshow.NetworkConnectivityObserver
 import com.example.movieshow.database.MovieDao
 import com.example.movieshow.database.MovieItem
 import com.example.movieshow.network.MovieApi
@@ -20,7 +23,8 @@ import kotlinx.coroutines.launch
 class MovieViewModel(private val movieDao: MovieDao, private val movieApi: MovieApi) : ViewModel() {
 
     var pageNo by mutableStateOf(0)
-    var lastScreen  = "Landing Page"
+    var lastScreen  = ""
+    var currentSreen =  "Watch List"
     var scrollState : MutableList<LazyListState> = MutableList(4){LazyListState(0,0)}
     lateinit var watchList : LiveData<List<MovieItem>>
 

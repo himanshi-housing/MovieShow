@@ -16,10 +16,16 @@
         android:theme="@style/Theme.MovieShow"
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
+        <activity
+            android:name=".ImageLoad"
+            android:exported="false"
+            android:label="@string/title_activity_image_load"
+            android:theme="@style/Theme.MovieShow" />
+
         <receiver
             android:name=".InternetOff"
             android:enabled="true"
-            android:exported="true"></receiver>
+            android:exported="true" />
 
         <activity
             android:name=".MainActivity"

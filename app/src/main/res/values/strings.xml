@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">MovieShow</string>
+    <string name="title_activity_image_load">ImageLoad</string>
 </resources>

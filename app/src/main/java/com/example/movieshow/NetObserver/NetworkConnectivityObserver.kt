@@ -1,4 +1,4 @@
-package com.example.movieshow
+package com.example.movieshow.NetObserver
 
 import android.content.Context
 import android.net.ConnectivityManager
@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 
-class NetworkConnectivityObserver( private val context: Context) : ConnectivityObserver{
+class NetworkConnectivityObserver( private val context: Context) : ConnectivityObserver {
 
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as  ConnectivityManager
 

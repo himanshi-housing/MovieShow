@@ -25,7 +25,7 @@ class MovieViewModel(private val movieDao: MovieDao, private val movieApi: Movie
     var pageNo by mutableStateOf(0)
     var lastScreen  = ""
     var currentSreen =  "Watch List"
-    var scrollState : MutableList<LazyListState> = MutableList(4){LazyListState(0,0)}
+//    var scrollState : MutableList<LazyListState> = MutableList(4){LazyListState(0,0)}
     lateinit var watchList : LiveData<List<MovieItem>>
 
     val popular = Pager(PagingConfig(pageSize = 20)) {

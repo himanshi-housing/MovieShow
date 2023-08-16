@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.os.Bundle
 import android.util.Log
+//import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -58,6 +59,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -82,7 +84,6 @@ import com.example.movieshow.ui.theme.MovieShowTheme
 import com.example.movieshow.viewModels.MovieViewModel
 import kotlinx.coroutines.launch
 import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.paging.compose.itemsIndexed
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.flow.launchIn
@@ -118,14 +119,11 @@ class MainActivity : ComponentActivity() {
                     ) {
                         connectivityObserver.observe().onEach {
                             status = it
-                            Log.d("Himanshi",status.toString())
                         }.launchIn(lifecycleScope)
 
                         val status by connectivityObserver.observe().collectAsState(initial = ConnectivityObserver.Status.Unavailable)
 
-//                        Log.d("Himanshi1",status1.toString())
                         if(status  == ConnectivityObserver.Status.Available){
-                            Log.d("Himanshi",lastVisitedScreen)
                             if(lastVisitedScreen=="")
                                 movieViewModel.currentSreen = "Landing Page"
                             else
@@ -168,7 +166,6 @@ class MainActivity : ComponentActivity() {
             // Save the last visited screen information (e.g., screen name or index) to SharedPreferences
             editor.putString("lastVisitedScreen", movieViewModel.lastScreen) // Replace "ScreenName" with the appropriate identifier for your screen
             editor.apply()
-            Log.d("Himanshi",movieViewModel.lastScreen)
         }
 }
 
@@ -206,8 +203,6 @@ fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel){
                             .width(20.dp)
                             .clickable {
 //                                movieViewModel.getWatchlistMovie()
-                                movieViewModel.scrollState =
-                                    MutableList(4) { LazyListState(0, 0) }
                                 movieViewModel.lastScreen = "Watch List"
                                 navController.navigate("Watch List")
                             })
@@ -227,33 +222,28 @@ fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel){
         },
         bottomBar = { BottomAppBar(modifier = Modifier.fillMaxWidth(),
             actions = {
-                IconButton(onClick = { movieViewModel.pageNo = 0
-                                       movieViewModel.scrollState = MutableList(4){LazyListState(0,0)} },
+                IconButton(onClick = { movieViewModel.pageNo = 0 },
                     modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Image(painter = painterResource(id = R.drawable.fire), contentDescription = "", modifier = Modifier.weight(1f))
                         Text(text = "popular", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                         }
                     }
-                IconButton(onClick = { movieViewModel.pageNo = 1
-                    movieViewModel.scrollState = MutableList(4){LazyListState(0,0)}},
+                IconButton(onClick = { movieViewModel.pageNo = 1 },
                     modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Image(painter = painterResource(id = R.drawable.punch), contentDescription = "", modifier = Modifier.weight(1f))
                         Text(text = "upcoming", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                     }
                 }
-                IconButton(onClick = { movieViewModel.pageNo = 2
-                    movieViewModel.scrollState = MutableList(4){LazyListState(0,0)}},
+                IconButton(onClick = { movieViewModel.pageNo = 2 },
                     modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Image(painter = painterResource(id = R.drawable.play), contentDescription = "", modifier = Modifier.weight(1f))
                         Text(text = "trending", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                     }
                 }
-                IconButton(onClick = { movieViewModel.pageNo = 3
-                    movieViewModel.scrollState = MutableList(4){LazyListState(0,0)}
-                    },
+                IconButton(onClick = { movieViewModel.pageNo = 3 },
                     modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Image(painter = painterResource(id = R.drawable.star), contentDescription = "", modifier = Modifier.weight(1f))
@@ -279,120 +269,103 @@ fun Listview(movieViewModel: MovieViewModel, navController: NavController, margi
         movieViewModel.trending.collectAsLazyPagingItems(),
         movieViewModel.topRated.collectAsLazyPagingItems()
     )
-    var scrollState = movieViewModel.scrollState[movieViewModel.pageNo]
 
-    when(movieType[movieViewModel.pageNo].loadState.refresh){
-        LoadState.Loading -> {
-
-        }
-        is LoadState.Error -> {
-
-        }
-        else -> {
-            Column(modifier = Modifier.padding(margin)) {
-                if(scrollState.isScrollInProgress){
-                    movieViewModel.scrollState[movieViewModel.pageNo]= LazyListState(scrollState.firstVisibleItemIndex,scrollState.firstVisibleItemScrollOffset)
-                    Log.d("Himanshi",movieViewModel.scrollState.toString())
-                }
-                LazyColumn(state = movieViewModel.scrollState[movieViewModel.pageNo]) {
-                    itemsIndexed(items = movieType[movieViewModel.pageNo]) {
-                            index, item ->
-                        Card(
-                            modifier = Modifier
-                                .padding(start = 15.dp, end = 15.dp)
-                                .padding(top = 10.dp)
-                                .height(200.dp)
-                                .shadow(5.dp, shape = RoundedCornerShape(15.dp))
-                                .clickable {
-                                    navController.navigate(
-                                        "Detailed View/Landing Page/${item?.originalTitle}/${item?.overview}/${
-                                            item?.posterPath?.replace(
-                                                "/",
-                                                ""
-                                            )
-                                        }"
-                                    )
-                                },
-                            colors = CardDefaults.cardColors(containerColor = Color.White)
-                        ) {
-                            Row(horizontalArrangement = Arrangement.SpaceBetween) {
-                                AsyncImage(
-                                    model = "https://image.tmdb.org/t/p/w500/${item?.posterPath}",
-                                    contentDescription = "",
-                                    modifier = Modifier
-                                        .padding(10.dp)
-                                        .clip(shape = RoundedCornerShape(15.dp)),
-                                    error = painterResource(id = R.drawable.baseline_image_24)
+    LazyColumn() {
+        itemsIndexed(items = movieType[movieViewModel.pageNo]) {
+                index, item ->
+            Card(
+                modifier = Modifier
+                    .padding(start = 15.dp, end = 15.dp)
+                    .padding(top = 10.dp)
+                    .height(200.dp)
+                    .shadow(5.dp, shape = RoundedCornerShape(15.dp))
+                    .clickable {
+                        navController.navigate(
+                            "Detailed View/Landing Page/${item?.originalTitle}/${item?.overview}/${
+                                item?.posterPath?.replace(
+                                    "/",
+                                    ""
                                 )
-                                Column(
+                            }"
+                        )
+                    },
+                colors = CardDefaults.cardColors(containerColor = Color.White)
+            ) {
+                Row(horizontalArrangement = Arrangement.SpaceBetween) {
+                    AsyncImage(
+                        model = "https://image.tmdb.org/t/p/w500/${item?.posterPath}",
+                        contentDescription = "",
+                        modifier = Modifier
+                            .padding(10.dp)
+                            .clip(shape = RoundedCornerShape(15.dp)),
+                        error = painterResource(id = R.drawable.baseline_image_24)
+                    )
+                    Column(
+                        modifier = Modifier
+                            .padding(10.dp)
+                            .height(180.dp)
+                    ) {
+                        Column(modifier = Modifier.height(160.dp)) {
+                            Text(
+                                text = item?.originalTitle ?: "",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp,
+                                color = colorResource(id = R.color.navy)
+                            )
+                            Text(
+                                text = item?.overview ?: "", fontSize = 12.sp,
+                                modifier = Modifier
+                                    .padding(top = 10.dp)
+                                    .wrapContentWidth(),
+                                lineHeight = 15.sp,
+                                maxLines = 4,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (item?.voteAverage!! > 0) {
+                                Text(
+                                    text = item?.voteAverage.toString() ?: "",
+                                    color = Color.White,
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 14.sp,
                                     modifier = Modifier
-                                        .padding(10.dp)
-                                        .height(180.dp)
-                                ) {
-                                    Column(modifier = Modifier.height(160.dp)) {
-                                        Text(
-                                            text = item?.originalTitle ?: "",
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 15.sp,
-                                            color = colorResource(id = R.color.navy)
-                                        )
-                                        Text(
-                                            text = item?.overview ?: "", fontSize = 12.sp,
-                                            modifier = Modifier
-                                                .padding(top = 10.dp)
-                                                .wrapContentWidth(),
-                                            lineHeight = 15.sp,
-                                            maxLines = 4,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        if (item?.voteAverage!! > 0) {
-                                            Text(
-                                                text = item?.voteAverage.toString() ?: "",
-                                                color = Color.White,
-                                                textAlign = TextAlign.Center,
-                                                fontSize = 14.sp,
-                                                modifier = Modifier
-                                                    .width(40.dp)
-                                                    .height(40.dp)
-                                                    .padding(top = 10.dp)
-                                                    .clip(shape = RoundedCornerShape(15.dp))
-                                                    .background(color = colorResource(id = R.color.navy))
-                                                    .padding(5.dp),
-                                                overflow = TextOverflow.Clip
-                                            )
-                                        }
-                                    }
-                                    Row {
-                                        val scope = rememberCoroutineScope()
-                                        item?.releaseDate?.let { it1 ->
-                                            Text(
-                                                text = "release date: ${it1}",
-                                                fontSize = 12.sp,
-                                                color = colorResource(id = R.color.grey),
-                                                modifier = Modifier.width(170.dp)
-                                            )
-                                        }
-                                        IconButton(onClick = {
-                                            movieViewModel.addMovie(
-                                                MovieItem(
-                                                    item?.id ?: 0,
-                                                    System.currentTimeMillis(),
-                                                    item?.posterPath ?: "",
-                                                    item?.backdropPath ?: "",
-                                                    item?.originalTitle ?: "",
-                                                    item?.overview ?: ""
-                                                ))
-                                            onClick(item?.originalTitle?:"")
-                                        }) {
-                                            Icon(
-                                                painter = painterResource(id = R.drawable.baseline_add_circle_outline_24),
-                                                contentDescription = ""
-                                            )
-                                        }
-
-                                    }
-                                }
+                                        .width(40.dp)
+                                        .height(40.dp)
+                                        .padding(top = 10.dp)
+                                        .clip(shape = RoundedCornerShape(15.dp))
+                                        .background(color = colorResource(id = R.color.navy))
+                                        .padding(5.dp),
+                                    overflow = TextOverflow.Clip
+                                )
                             }
+                        }
+                        Row {
+                            val scope = rememberCoroutineScope()
+                            item?.releaseDate?.let { it1 ->
+                                Text(
+                                    text = "release date: ${it1}",
+                                    fontSize = 12.sp,
+                                    color = colorResource(id = R.color.grey),
+                                    modifier = Modifier.width(170.dp)
+                                )
+                            }
+                            IconButton(onClick = {
+                                movieViewModel.addMovie(
+                                    MovieItem(
+                                        item?.id ?: 0,
+                                        System.currentTimeMillis(),
+                                        item?.posterPath ?: "",
+                                        item?.backdropPath ?: "",
+                                        item?.originalTitle ?: "",
+                                        item?.overview ?: ""
+                                    ))
+                                onClick(item?.originalTitle?:"")
+                            }) {
+                                Icon(
+                                    painter = painterResource(id = R.drawable.baseline_add_circle_outline_24),
+                                    contentDescription = ""
+                                )
+                            }
+
                         }
                     }
                 }
@@ -412,7 +385,6 @@ fun DetailedView(navController: NavController, poster : String, title : String, 
     var count by remember {
         mutableStateOf(0)
     }
-    Column(modifier = Modifier.fillMaxSize()){
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             item {
                 Column(
@@ -456,22 +428,13 @@ fun DetailedView(navController: NavController, poster : String, title : String, 
 
                             }
                         }
-                    } else
+                    } else {
                         AsyncImage(
                             model = poster,
                             contentDescription = "",
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.FillBounds
                         )
-                    Box(modifier = Modifier.fillMaxSize()) {
-
-                        Icon(painter = painterResource(id = R.drawable.baseline_keyboard_arrow_left_24),
-                            contentDescription = "",
-                            tint = Color.White,
-                            modifier = Modifier
-                                .padding(10.dp)
-                                .clickable {
-                                    navController.navigate(lastScreen)
-                                })
                     }
                 }
             }
@@ -490,18 +453,16 @@ fun DetailedView(navController: NavController, poster : String, title : String, 
                 }
             }
         }
-        Box(modifier = Modifier.fillMaxSize()) {
-
+        Box(modifier = Modifier) {
             Icon(painter = painterResource(id = R.drawable.baseline_keyboard_arrow_left_24),
                 contentDescription = "",
                 tint = Color.White,
                 modifier = Modifier
                     .padding(10.dp)
                     .clickable {
-                        navController.navigate(lastScreen)
+                        navController.popBackStack()
                     })
         }
-    }
 }
 
 @Composable
@@ -516,8 +477,8 @@ fun Watchlist(navController: NavController, movieViewModel: MovieViewModel){
                 modifier = Modifier
                     .padding(end = 10.dp)
                     .clickable {
-                        movieViewModel.lastScreen = "Landing Page"
-                        navController.navigate("Landing Page")
+                            movieViewModel.lastScreen = "Landing Page"
+                            navController.popBackStack()
                     })
             Text(text = "watchlist", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         }
@@ -533,8 +494,8 @@ fun Watchlist(navController: NavController, movieViewModel: MovieViewModel){
                         AsyncImage(model = "https://image.tmdb.org/t/p/w500/${it.shortPoster}",
                             contentDescription = "",
                             modifier = Modifier
-                                .clip(shape = RoundedCornerShape(10.dp))
                                 .fillMaxSize()
+                                .clip(shape = RoundedCornerShape(10.dp))
                                 .clickable {
                                     movieViewModel.lastScreen = "Watch List"
                                     navController.navigate(
@@ -545,7 +506,8 @@ fun Watchlist(navController: NavController, movieViewModel: MovieViewModel){
                                             )
                                         }"
                                     )
-                                }
+                                },
+                            contentScale = ContentScale.FillBounds
                         )
                         Box(modifier = Modifier
                             .matchParentSize()
@@ -581,9 +543,4 @@ fun Watchlist(navController: NavController, movieViewModel: MovieViewModel){
         }
 
     }
-}
-
-@Composable
-fun RetryUI(){
-
 }

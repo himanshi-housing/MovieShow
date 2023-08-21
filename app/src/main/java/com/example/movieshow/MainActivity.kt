@@ -124,19 +124,18 @@ class MainActivity : ComponentActivity() {
                         val status by connectivityObserver.observe().collectAsState(initial = ConnectivityObserver.Status.Unavailable)
 
                         if(status  == ConnectivityObserver.Status.Available){
-                            if(lastVisitedScreen=="")
+                            if(lastVisitedScreen=="") {
                                 movieViewModel.currentSreen = "Landing Page"
-                            else
+                                movieViewModel.lastScreen = "Landing Page"
+                            }
+                            else {
                                 movieViewModel.currentSreen = lastVisitedScreen
+                                movieViewModel.lastScreen = lastVisitedScreen
+                            }
                         }
                         else if(status == ConnectivityObserver.Status.Unavailable || status == ConnectivityObserver.Status.Lost)
                                 movieViewModel.currentSreen  = "Watch List"
-                        if (lastVisitedScreen !="") {
-                            movieViewModel.lastScreen = lastVisitedScreen ?: "Landing Page"
-                        }
-                        else{
-                            movieViewModel.lastScreen = "Landing Page"
-                        }
+
                         val navControl = rememberNavController()
                         NavHost(navController = navControl,
                         startDestination = movieViewModel.currentSreen){
@@ -487,8 +486,13 @@ fun Watchlist(navController: NavController, movieViewModel: MovieViewModel){
                 modifier = Modifier
                     .padding(end = 10.dp)
                     .clickable {
-                        movieViewModel.lastScreen = "Landing Page"
-                        navController.popBackStack()
+                        Log.d("Hi",movieViewModel.lastScreen)
+                        if(movieViewModel.lastScreen=="" || movieViewModel.lastScreen=="Watch List") {
+                            movieViewModel.lastScreen = "Landing Page"
+                            navController.navigate("Landing Page")
+                        }
+                        else
+                            navController.popBackStack()
                     })
             Text(text = "watchlist", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         }

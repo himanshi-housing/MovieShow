@@ -375,94 +375,104 @@ fun Listview(movieViewModel: MovieViewModel, navController: NavController, margi
 }
 
 
-@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter", "CoroutineCreationDuringComposition",
+    "UnusedMaterialScaffoldPaddingParameter"
+)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DetailedView(navController: NavController, poster : String, title : String, descrptn : String, lastScreen : String, status: ConnectivityObserver.Status){
-    var isclicked by remember {
+    var isClicked by remember {
         mutableStateOf(false)
     }
     var count by remember {
         mutableStateOf(0)
     }
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(590.dp)
-                        .clip(RoundedCornerShape(bottomStart = 35.dp, bottomEnd = 35.dp))
-                        .shadow(5.dp)
-                ) {
-                    if (status != ConnectivityObserver.Status.Available) {
-                        val painter = rememberAsyncImagePainter(model = poster)
-                        if (painter.state is AsyncImagePainter.State.Error) {
-                            Text(text = "Image no loaded")
-                        } else if (painter.state is AsyncImagePainter.State.Success) {
-                            Image(
-                                painter = rememberAsyncImagePainter(model = poster),
-                                contentDescription = ""
-                            )
-                        } else {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                if (count <= 5) {
-                                    Button(modifier = Modifier,
-                                        onClick = {
-                                            isclicked = true
-                                            count += 1
-                                        }) {
-                                        Text(text = "Retry")
-                                    }
-                                    if (isclicked) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(64.dp),
-                                            color = Color.DarkGray,
-                                            strokeWidth = 6.dp
-                                        )
-                                    }
-                                }
-
-                            }
-                        }
-                    } else {
-                        AsyncImage(
-                            model = poster,
-                            contentDescription = "",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.FillBounds
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(590.dp)
+                    .clip(RoundedCornerShape(bottomStart = 35.dp, bottomEnd = 35.dp))
+                    .shadow(5.dp)
+            ) {
+                if (status != ConnectivityObserver.Status.Available) {
+                    val painter = rememberAsyncImagePainter(model = poster)
+                    if (painter.state is AsyncImagePainter.State.Error) {
+                        Text(text = "Image no loaded")
+                    } else if (painter.state is AsyncImagePainter.State.Success) {
+                        Image(
+                            painter = rememberAsyncImagePainter(model = poster),
+                            contentDescription = ""
                         )
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            if (count <= 5) {
+                                Button(modifier = Modifier,
+                                    onClick = {
+                                        isClicked = true
+                                        count += 1
+                                    }) {
+                                    Text(text = "Retry")
+                                }
+                                if (isClicked) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(64.dp),
+                                        color = Color.DarkGray,
+                                        strokeWidth = 6.dp
+                                    )
+                                }
+                            }
+                            else{
+                                Scaffold(snackbarHost = { SnackbarHost(hostState = snackbarHostState)}, topBar = {}, content = {})
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Error!")
+                                }
+                            }
+
+                        }
                     }
-                }
-            }
-            item {
-                Column(
-                    modifier = Modifier
-                        .padding(start = 15.dp, end = 15.dp, top = 30.dp, bottom = 10.dp)
-                ) {
-                    Text(text = title, fontSize = 25.sp, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        text = descrptn,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(top = 10.dp),
-                        lineHeight = 16.sp
+                } else {
+                    AsyncImage(
+                        model = poster,
+                        contentDescription = "",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.FillBounds
                     )
                 }
             }
         }
-        Box(modifier = Modifier) {
-            Icon(painter = painterResource(id = R.drawable.baseline_keyboard_arrow_left_24),
-                contentDescription = "",
-                tint = Color.White,
+        item {
+            Column(
                 modifier = Modifier
-                    .padding(10.dp)
-                    .clickable {
-                        navController.popBackStack()
-                    })
+                    .padding(start = 15.dp, end = 15.dp, top = 30.dp, bottom = 10.dp)
+            ) {
+                Text(text = title, fontSize = 25.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = descrptn,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(top = 10.dp),
+                    lineHeight = 16.sp
+                )
+            }
         }
+    }
+    Box(modifier = Modifier) {
+        Icon(painter = painterResource(id = R.drawable.baseline_keyboard_arrow_left_24),
+            contentDescription = "",
+            tint = Color.White,
+            modifier = Modifier
+                .padding(10.dp)
+                .clickable {
+                    navController.popBackStack()
+                })
+    }
 }
 
 @Composable
@@ -477,8 +487,8 @@ fun Watchlist(navController: NavController, movieViewModel: MovieViewModel){
                 modifier = Modifier
                     .padding(end = 10.dp)
                     .clickable {
-                            movieViewModel.lastScreen = "Landing Page"
-                            navController.popBackStack()
+                        movieViewModel.lastScreen = "Landing Page"
+                        navController.popBackStack()
                     })
             Text(text = "watchlist", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         }

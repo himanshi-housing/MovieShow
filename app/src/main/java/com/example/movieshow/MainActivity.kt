@@ -124,6 +124,7 @@ class MainActivity : ComponentActivity() {
                         val status by connectivityObserver.observe().collectAsState(initial = ConnectivityObserver.Status.Unavailable)
 
                         if(status  == ConnectivityObserver.Status.Available){
+                            movieViewModel.getAll()
                             if(lastVisitedScreen=="") {
                                 movieViewModel.currentSreen = "Landing Page"
                                 movieViewModel.lastScreen = "Landing Page"

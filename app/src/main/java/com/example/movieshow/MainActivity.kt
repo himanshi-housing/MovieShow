@@ -263,15 +263,15 @@ fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel){
 
 @Composable
 fun Listview(movieViewModel: MovieViewModel, navController: NavController, margin : PaddingValues, onClick : (title : String)-> Unit) {
-    val movieType = listOf(
-        movieViewModel.popular.collectAsLazyPagingItems(),
-        movieViewModel.upcoming.collectAsLazyPagingItems(),
-        movieViewModel.trending.collectAsLazyPagingItems(),
-        movieViewModel.topRated.collectAsLazyPagingItems()
-    )
+    val movieType = when(movieViewModel.pageNo){
+        0 -> movieViewModel.popular.collectAsLazyPagingItems()
+        1 -> movieViewModel.upcoming.collectAsLazyPagingItems()
+        2 -> movieViewModel.trending.collectAsLazyPagingItems()
+        else -> movieViewModel.topRated.collectAsLazyPagingItems()
+    }
 
     LazyColumn() {
-        itemsIndexed(items = movieType[movieViewModel.pageNo]) {
+        itemsIndexed(items = movieType) {
                 index, item ->
             Card(
                 modifier = Modifier

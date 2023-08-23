@@ -1,4 +1,4 @@
-package com.example.movieshow
+package com.example.movieshow.Observer
 
 import kotlinx.coroutines.flow.Flow
 

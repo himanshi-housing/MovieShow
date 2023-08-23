@@ -1,7 +1,5 @@
 package com.example.movieshow.viewModels
 
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,8 +10,6 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import com.example.movieshow.ConnectivityObserver
-import com.example.movieshow.NetworkConnectivityObserver
 import com.example.movieshow.database.MovieDao
 import com.example.movieshow.database.MovieItem
 import com.example.movieshow.models.Movie

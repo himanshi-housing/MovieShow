@@ -2,10 +2,7 @@ package com.example.movieshow
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.net.ConnectivityManager
 import android.os.Bundle
-import android.util.Log
-//import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -26,7 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Scaffold
@@ -73,8 +69,6 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.paging.LoadState
-import androidx.paging.compose.items
 import androidx.paging.compose.itemsIndexed
 import coil.compose.AsyncImage
 import com.example.movieshow.database.MovieDatabase
@@ -86,6 +80,8 @@ import kotlinx.coroutines.launch
 import androidx.paging.compose.collectAsLazyPagingItems
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
+import com.example.movieshow.Observer.ConnectivityObserver
+import com.example.movieshow.Observer.NetworkConnectivityObserver
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
@@ -490,7 +486,6 @@ fun Watchlist(navController: NavController, movieViewModel: MovieViewModel){
                 modifier = Modifier
                     .padding(end = 10.dp)
                     .clickable {
-                        Log.d("Hi", movieViewModel.lastScreen)
                         if (movieViewModel.lastScreen == "" || movieViewModel.lastScreen == "Watch List") {
                             movieViewModel.lastScreen = "Landing Page"
                             navController.navigate("Landing Page")

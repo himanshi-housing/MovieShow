@@ -1,10 +1,8 @@
 package com.example.movieshow.database
 
-import androidx.compose.ui.text.resolveDefaults
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import java.sql.Timestamp
 
 @Entity(tableName = "Watchlist")
 data class MovieItem(

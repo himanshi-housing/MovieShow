@@ -195,14 +195,13 @@ fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel){
                         text = "${movieType[movieViewModel.pageNo]} movies",
                         fontSize = 25.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.width(330.dp)
+                        modifier = Modifier.width(300.dp)
                     )
                     Icon(painter = painterResource(R.drawable.baseline_bookmarks_24),
                         contentDescription = "",
                         modifier = Modifier
-                            .width(20.dp)
+                            .weight(1f)
                             .clickable {
-//                                movieViewModel.getWatchlistMovie()
                                 movieViewModel.lastScreen = "Watch List"
                                 navController.navigate("Watch List")
                             })
@@ -220,7 +219,9 @@ fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel){
             title = it
         }
         },
-        bottomBar = { BottomAppBar(modifier = Modifier.fillMaxWidth(),
+        bottomBar = { BottomAppBar(modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape = RoundedCornerShape(topStart = 15.dp, topEnd = 15.dp)),
             actions = {
                 IconButton(onClick = { movieViewModel.pageNo = 0 },
                     modifier = Modifier.weight(1f)) {
@@ -256,7 +257,8 @@ fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel){
                         isClicked = false
                     }
                 }
-                })
+                },
+            containerColor = colorResource(id = R.color.yellow))
             }
         )
 }
@@ -270,11 +272,12 @@ fun Listview(movieViewModel: MovieViewModel, navController: NavController, margi
         else -> movieViewModel.topRated.collectAsLazyPagingItems()
     }
 
-    LazyColumn() {
+    LazyColumn(modifier = Modifier.padding(margin)) {
         itemsIndexed(items = movieType) {
                 index, item ->
             Card(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .padding(start = 15.dp, end = 15.dp)
                     .padding(top = 10.dp)
                     .height(200.dp)
@@ -345,7 +348,7 @@ fun Listview(movieViewModel: MovieViewModel, navController: NavController, margi
                                     text = "release date: ${it1}",
                                     fontSize = 12.sp,
                                     color = colorResource(id = R.color.grey),
-                                    modifier = Modifier.width(170.dp)
+                                    modifier = Modifier.width(160.dp)
                                 )
                             }
                             IconButton(onClick = {
@@ -463,10 +466,10 @@ fun DetailedView(navController: NavController, poster : String, title : String, 
             }
         }
     }
-    Box(modifier = Modifier) {
+    Box(modifier = Modifier.padding(bottom = 20.dp)) {
         Icon(painter = painterResource(id = R.drawable.baseline_keyboard_arrow_left_24),
             contentDescription = "",
-            tint = Color.White,
+            tint = if(status == ConnectivityObserver.Status.Available) Color.White else Color.Black,
             modifier = Modifier
                 .padding(10.dp)
                 .clickable {
@@ -487,12 +490,11 @@ fun Watchlist(navController: NavController, movieViewModel: MovieViewModel){
                 modifier = Modifier
                     .padding(end = 10.dp)
                     .clickable {
-                        Log.d("Hi",movieViewModel.lastScreen)
-                        if(movieViewModel.lastScreen=="" || movieViewModel.lastScreen=="Watch List") {
+                        Log.d("Hi", movieViewModel.lastScreen)
+                        if (movieViewModel.lastScreen == "" || movieViewModel.lastScreen == "Watch List") {
                             movieViewModel.lastScreen = "Landing Page"
                             navController.navigate("Landing Page")
-                        }
-                        else
+                        } else
                             navController.popBackStack()
                     })
             Text(text = "watchlist", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)

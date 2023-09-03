@@ -23,7 +23,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.Scaffold
 import androidx.compose.material.SnackbarHost
@@ -69,6 +71,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.itemsIndexed
 import coil.compose.AsyncImage
 import com.example.movieshow.database.MovieDatabase
@@ -78,10 +81,12 @@ import com.example.movieshow.ui.theme.MovieShowTheme
 import com.example.movieshow.viewModels.MovieViewModel
 import kotlinx.coroutines.launch
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.items
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
 import com.example.movieshow.Observer.ConnectivityObserver
 import com.example.movieshow.Observer.NetworkConnectivityObserver
+import com.example.movieshow.models.Movie
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
@@ -133,11 +138,27 @@ class MainActivity : ComponentActivity() {
                         else if(status == ConnectivityObserver.Status.Unavailable || status == ConnectivityObserver.Status.Lost)
                                 movieViewModel.currentSreen  = "Watch List"
 
+                        val popular = movieViewModel.popular.collectAsLazyPagingItems()
+                        val upcoming = movieViewModel.upcoming.collectAsLazyPagingItems()
+                        val trending = movieViewModel.trending.collectAsLazyPagingItems()
+                        val topRated = movieViewModel.topRated.collectAsLazyPagingItems()
+                        val stateList = listOf<LazyListState>(rememberLazyListState(), rememberLazyListState(), rememberLazyListState(), rememberLazyListState())
+                        val movieType = listOf<String>("popular","upcoming","trending","top-rated")
+
                         val navControl = rememberNavController()
                         NavHost(navController = navControl,
                         startDestination = movieViewModel.currentSreen){
                             composable("Landing Page"){
-                                LandingPage(navController = navControl, movieViewModel)
+                                LandingPage(navController = navControl, movieViewModel, movieType[0], popular, stateList[0])
+                            }
+                            composable("Upcoming"){
+                                LandingPage(navController = navControl, movieViewModel, movieType[1], upcoming, stateList[1])
+                            }
+                            composable("Trending"){
+                                LandingPage(navController = navControl, movieViewModel, movieType[2], trending, stateList[2])
+                            }
+                            composable("Top-Rated"){
+                                LandingPage(navController = navControl, movieViewModel, movieType[3], topRated, stateList[3])
                             }
                             composable("Detailed View/{lastscreen}/{title}/{desc}/{poster}"){
                                 val lastScreen = it.arguments?.getString("lastscreen") ?: "Landing Page"
@@ -170,8 +191,7 @@ class MainActivity : ComponentActivity() {
 )
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel){
-    val movieType = listOf<String>("popular","upcoming","trending","top-rated")
+fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel,movieType : String, movieList : LazyPagingItems<Movie>,colState : LazyListState){
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var isClicked by remember {
@@ -188,7 +208,7 @@ fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel){
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${movieType[movieViewModel.pageNo]} movies",
+                        text = "${movieType} movies",
                         fontSize = 25.sp,
                         fontWeight = FontWeight.ExtraBold,
                         modifier = Modifier.width(300.dp)
@@ -210,7 +230,7 @@ fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel){
             modifier = Modifier
                 .clip(shape = RoundedCornerShape(0.dp, 0.dp, 15.dp, 15.dp)),
         )},
-        content = { margin -> Listview( movieViewModel, navController, margin) {
+        content = { margin -> Listview( movieViewModel, navController, movieList, colState, margin) {
             isClicked = true
             title = it
         }
@@ -219,28 +239,36 @@ fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel){
             .fillMaxWidth()
             .clip(shape = RoundedCornerShape(topStart = 15.dp, topEnd = 15.dp)),
             actions = {
-                IconButton(onClick = { movieViewModel.pageNo = 0 },
+                IconButton(onClick = {
+                    navController.navigate("Landing Page")
+                    movieViewModel.pageNo = 0 },
                     modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Image(painter = painterResource(id = R.drawable.fire), contentDescription = "", modifier = Modifier.weight(1f))
                         Text(text = "popular", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                         }
                     }
-                IconButton(onClick = { movieViewModel.pageNo = 1 },
+                IconButton(onClick = {
+                    navController.navigate("Upcoming")
+                    movieViewModel.pageNo = 1 },
                     modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Image(painter = painterResource(id = R.drawable.punch), contentDescription = "", modifier = Modifier.weight(1f))
                         Text(text = "upcoming", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                     }
                 }
-                IconButton(onClick = { movieViewModel.pageNo = 2 },
+                IconButton(onClick = {
+                    navController.navigate("Trending")
+                    movieViewModel.pageNo = 2 },
                     modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Image(painter = painterResource(id = R.drawable.play), contentDescription = "", modifier = Modifier.weight(1f))
                         Text(text = "trending", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                     }
                 }
-                IconButton(onClick = { movieViewModel.pageNo = 3 },
+                IconButton(onClick = {
+                    navController.navigate("Top-Rated")
+                    movieViewModel.pageNo = 3 },
                     modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Image(painter = painterResource(id = R.drawable.star), contentDescription = "", modifier = Modifier.weight(1f))
@@ -260,17 +288,11 @@ fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel){
 }
 
 @Composable
-fun Listview(movieViewModel: MovieViewModel, navController: NavController, margin : PaddingValues, onClick : (title : String)-> Unit) {
-    val movieType = when(movieViewModel.pageNo){
-        0 -> movieViewModel.popular.collectAsLazyPagingItems()
-        1 -> movieViewModel.upcoming.collectAsLazyPagingItems()
-        2 -> movieViewModel.trending.collectAsLazyPagingItems()
-        else -> movieViewModel.topRated.collectAsLazyPagingItems()
-    }
+fun Listview(movieViewModel: MovieViewModel, navController: NavController, movieList : LazyPagingItems<Movie>, colState: LazyListState, margin : PaddingValues, onClick : (title : String)-> Unit) {
 
-    LazyColumn(modifier = Modifier.padding(margin)) {
-        itemsIndexed(items = movieType) {
-                index, item ->
+    LazyColumn(modifier = Modifier.padding(margin), state = colState) {
+        items(items = movieList) {
+                item ->
             Card(
                 modifier = Modifier
                     .fillMaxWidth()

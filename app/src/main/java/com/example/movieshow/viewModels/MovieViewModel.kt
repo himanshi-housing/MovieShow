@@ -15,57 +15,34 @@ import com.example.movieshow.database.MovieItem
 import com.example.movieshow.models.Movie
 import com.example.movieshow.network.MovieApi
 import com.example.movieshow.paging.MoviePagingSource
+import com.example.movieshow.repository.MovieRepo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
-class MovieViewModel(private val movieDao: MovieDao, private val movieApi: MovieApi) : ViewModel() {
+class MovieViewModel(private val repository : MovieRepo) : ViewModel() {
 
     var pageNo by mutableStateOf(0)
     var lastScreen  = ""
     var currentSreen =  "Watch List"
-    lateinit var watchList : LiveData<List<MovieItem>>
-    lateinit var popular : Flow<PagingData<Movie>>
-    lateinit var upcoming : Flow<PagingData<Movie>>
-    lateinit var trending : Flow<PagingData<Movie>>
-    lateinit var topRated : Flow<PagingData<Movie>>
-
+    val watchList : LiveData<List<MovieItem>>
+        get() = repository.watchList
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            watchList = movieDao.getAll()
+            repository.getMovies()
         }
-        getAll()
     }
 
-    fun getAll(){
-        popular = Pager(PagingConfig(pageSize = 20)) {
-            MoviePagingSource(movieApi,"popular" )
-        }.flow.cachedIn(viewModelScope)
-
-        upcoming = Pager(PagingConfig(pageSize = 20)) {
-            MoviePagingSource(movieApi,"upcoming")
-        }.flow.cachedIn(viewModelScope)
-
-        trending = Pager(PagingConfig(pageSize = 20)) {
-            MoviePagingSource(movieApi,"trending")
-        }.flow.cachedIn(viewModelScope)
-
-        topRated = Pager(PagingConfig(pageSize = 20)) {
-            MoviePagingSource(movieApi,"toprated")
-        }.flow.cachedIn(viewModelScope)
-
-    }
     fun addMovie(movie : MovieItem){
         viewModelScope.launch(Dispatchers.IO) {
-            movieDao.insert(movie)
+            repository.addMovie(movie)
         }
     }
 
     fun deleteMovie(id : Int){
         viewModelScope.launch(Dispatchers.IO) {
-            movieDao.deleteId(id)
+            repository.deleteMovie(id)
         }
     }
-
 }

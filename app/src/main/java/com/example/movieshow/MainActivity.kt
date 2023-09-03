@@ -87,12 +87,21 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.movieshow.Observer.ConnectivityObserver
 import com.example.movieshow.Observer.NetworkConnectivityObserver
 import com.example.movieshow.models.Movie
+import com.example.movieshow.repository.MovieRepo
+import com.example.movieshow.viewModels.PopularViewModel
+import com.example.movieshow.viewModels.TopRatedViewModel
+import com.example.movieshow.viewModels.TrendingViewModel
+import com.example.movieshow.viewModels.UpcompingViewModel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
 
 class MainActivity : ComponentActivity() {
     lateinit var movieViewModel : MovieViewModel
+    lateinit var popularViewModel: PopularViewModel
+    lateinit var upcompingViewModel: UpcompingViewModel
+    lateinit var trendingViewModel: TrendingViewModel
+    lateinit var topRatedViewModel: TopRatedViewModel
     lateinit var connectivityObserver: ConnectivityObserver
     @SuppressLint("UnrememberedMutableState", "FlowOperatorInvokedInComposition",
         "CoroutineCreationDuringComposition"
@@ -100,32 +109,39 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        lateinit var status : ConnectivityObserver.Status
         connectivityObserver  = NetworkConnectivityObserver(applicationContext)
 
         val movieDao = MovieDatabase.getInstance(this).movieDao()
         val movieApi = MovieApi.getMovieApi(MovieApi.getRetrofit())
-        val viewModelFactory = MovieViewModelFactory(movieDao, movieApi)
-        movieViewModel = ViewModelProvider(this, viewModelFactory)[MovieViewModel::class.java]
+        val repo = MovieRepo(movieDao, movieApi)
+        val movieFactory = MovieViewModelFactory(repo)
+        val popularFactory = PopularViewModelFactory(repo)
+        val upcomingFactory = UpcomingViewModeFactory(repo)
+        val trendingFactory = TrendingViewModelFactory(repo)
+        val topRatedFactory = TopRatedViewModelFactory(repo)
+        movieViewModel = ViewModelProvider(this, movieFactory)[MovieViewModel::class.java]
+        popularViewModel = ViewModelProvider(this, popularFactory)[PopularViewModel::class.java]
+        upcompingViewModel = ViewModelProvider(this, upcomingFactory)[UpcompingViewModel::class.java]
+        trendingViewModel = ViewModelProvider(this, trendingFactory)[TrendingViewModel::class.java]
+        topRatedViewModel = ViewModelProvider(this, topRatedFactory)[TopRatedViewModel::class.java]
 
         val sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
         val lastVisitedScreen = sharedPreferences.getString("lastVisitedScreen", "") ?: "Landing Page"
 
         setContent() {
                 MovieShowTheme {
-                    // A surface container using the 'background' color from the theme
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                        connectivityObserver.observe().onEach {
-                            status = it
-                        }.launchIn(lifecycleScope)
-
                         val status by connectivityObserver.observe().collectAsState(initial = ConnectivityObserver.Status.Unavailable)
 
                         if(status  == ConnectivityObserver.Status.Available){
-                            movieViewModel.getAll()
+                            popularViewModel.getMovie()
+                            upcompingViewModel.getMovie()
+                            trendingViewModel.getMovie()
+                            topRatedViewModel.getMovie()
+
                             if(lastVisitedScreen=="") {
                                 movieViewModel.currentSreen = "Landing Page"
                                 movieViewModel.lastScreen = "Landing Page"
@@ -138,10 +154,10 @@ class MainActivity : ComponentActivity() {
                         else if(status == ConnectivityObserver.Status.Unavailable || status == ConnectivityObserver.Status.Lost)
                                 movieViewModel.currentSreen  = "Watch List"
 
-                        val popular = movieViewModel.popular.collectAsLazyPagingItems()
-                        val upcoming = movieViewModel.upcoming.collectAsLazyPagingItems()
-                        val trending = movieViewModel.trending.collectAsLazyPagingItems()
-                        val topRated = movieViewModel.topRated.collectAsLazyPagingItems()
+                        val popular = popularViewModel.popular.collectAsLazyPagingItems()
+                        val upcoming = upcompingViewModel.upcoming.collectAsLazyPagingItems()
+                        val trending = trendingViewModel.trending.collectAsLazyPagingItems()
+                        val topRated = topRatedViewModel.topRated.collectAsLazyPagingItems()
                         val stateList = listOf<LazyListState>(rememberLazyListState(), rememberLazyListState(), rememberLazyListState(), rememberLazyListState())
                         val movieType = listOf<String>("popular","upcoming","trending","top-rated")
 
@@ -149,16 +165,16 @@ class MainActivity : ComponentActivity() {
                         NavHost(navController = navControl,
                         startDestination = movieViewModel.currentSreen){
                             composable("Landing Page"){
-                                LandingPage(navController = navControl, movieViewModel, movieType[0], popular, stateList[0])
+                                LandingPage(navController = navControl,movieViewModel, movieType[0], popular, stateList[0])
                             }
                             composable("Upcoming"){
-                                LandingPage(navController = navControl, movieViewModel, movieType[1], upcoming, stateList[1])
+                                LandingPage(navController = navControl,movieViewModel, movieType[1], upcoming, stateList[1])
                             }
                             composable("Trending"){
-                                LandingPage(navController = navControl, movieViewModel, movieType[2], trending, stateList[2])
+                                LandingPage(navController = navControl,movieViewModel, movieType[2], trending, stateList[2])
                             }
                             composable("Top-Rated"){
-                                LandingPage(navController = navControl, movieViewModel, movieType[3], topRated, stateList[3])
+                                LandingPage(navController = navControl,movieViewModel, movieType[3], topRated, stateList[3])
                             }
                             composable("Detailed View/{lastscreen}/{title}/{desc}/{poster}"){
                                 val lastScreen = it.arguments?.getString("lastscreen") ?: "Landing Page"
@@ -180,8 +196,7 @@ class MainActivity : ComponentActivity() {
             super.onStop()
             val sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
             val editor = sharedPreferences.edit()
-            // Save the last visited screen information (e.g., screen name or index) to SharedPreferences
-            editor.putString("lastVisitedScreen", movieViewModel.lastScreen) // Replace "ScreenName" with the appropriate identifier for your screen
+            editor.putString("lastVisitedScreen", movieViewModel.lastScreen)
             editor.apply()
         }
 }
@@ -191,7 +206,7 @@ class MainActivity : ComponentActivity() {
 )
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LandingPage(navController: NavController,  movieViewModel : MovieViewModel,movieType : String, movieList : LazyPagingItems<Movie>,colState : LazyListState){
+fun LandingPage(navController: NavController, movieViewModel: MovieViewModel ,movieType : String, movieList : LazyPagingItems<Movie>,colState : LazyListState){
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var isClicked by remember {
@@ -498,7 +513,6 @@ fun DetailedView(navController: NavController, poster : String, title : String, 
 
 @Composable
 fun Watchlist(navController: NavController, movieViewModel: MovieViewModel){
-    val scope = rememberCoroutineScope()
     val listOfMovies by movieViewModel.watchList.observeAsState(listOf())
 
     Column(modifier = Modifier.padding(15.dp)) {

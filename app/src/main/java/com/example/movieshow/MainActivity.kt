@@ -92,10 +92,11 @@ import com.example.movieshow.viewModels.PopularViewModel
 import com.example.movieshow.viewModels.TopRatedViewModel
 import com.example.movieshow.viewModels.TrendingViewModel
 import com.example.movieshow.viewModels.UpcompingViewModel
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
-
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     lateinit var movieViewModel : MovieViewModel
     lateinit var popularViewModel: PopularViewModel
